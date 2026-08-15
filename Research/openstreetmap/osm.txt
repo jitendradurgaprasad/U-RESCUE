@@ -1,0 +1,20 @@
+3. OpenStreetMap (OSM) — Correct
+
+OpenStreetMap is essentially a community-maintained map of the world.
+
+It provides:
+
+Roads
+Buildings
+Footpaths
+Water bodies
+Land-use information
+Public facilities
+
+For U Rescue, OSM can help with:
+
+Visual maps
+Route planning
+Evacuation paths
+Locating hospitals and shelters
+Campus mapping
