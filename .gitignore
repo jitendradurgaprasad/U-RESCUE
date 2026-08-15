@@ -103,3 +103,7 @@ backend/.pytest_cache/
 !frontend/README.md
 
 Source_code/training_dataset_v2.csv
+
+grass_cmd_output.txt
+
+input and outputs.txt
