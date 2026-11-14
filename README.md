@@ -1,5 +1,9 @@
 # U RESCUE
 
+## Live project
+
+**[Open the U-RESCUE web app](https://u-rescue.vercel.app)** — use the map to choose a location, select a search radius, view the two highest sampled elevation areas, and see available walking routes to them.
+
 A terrain-screening prototype for exploring the highest sampled elevation areas around a chosen location in the configured Hyderabad and Sangareddy study area. It is not a flood-safety or navigation service.
 
 ## Data available
