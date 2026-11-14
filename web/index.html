@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>U RESCUE · Nearby high ground</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.14.0/dist/maplibre-gl.css">
+  <style>
+    *{box-sizing:border-box}html,body,#map{height:100%;margin:0}body{font:15px system-ui;color:#102a43}
+    #panel{position:absolute;z-index:2;left:16px;top:16px;width:min(340px,calc(100vw - 32px));padding:16px;background:#fff;border-radius:14px;box-shadow:0 4px 24px #17324d33}
+    h1{font-size:20px;margin:0 0 5px}.hint,.status,.note{font-size:13px;color:#52667a;line-height:1.45;margin:7px 0 12px}
+    label{display:block;font-size:14px;font-weight:650;margin:14px 0 6px}button,select{width:100%;padding:12px;border:1px solid #bcccdc;border-radius:9px;font:inherit}
+    button{background:#087e8b;color:white;border:0;font-weight:700;cursor:pointer}button:disabled{opacity:.65;cursor:wait}select{background:white;color:#102a43}
+    #status{margin-top:12px;font-size:13px;line-height:1.4}.result{margin-top:10px;padding:10px;border-radius:9px;background:#edf7f7;font-size:13px}
+    .marker{width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 7px #102a4380;display:grid;place-items:center;color:white;font-weight:800}
+    .marker span{transform:rotate(45deg)}.origin{background:#087e8b}.peak{background:#d1495b}.maplibregl-popup-content{font:14px system-ui;border-radius:8px}
+    .credits{position:absolute;right:7px;bottom:7px;z-index:1;background:#fffE;padding:4px 7px;border-radius:5px;font-size:11px}
+    @media(max-width:600px){#panel{top:10px;left:10px;width:min(310px,calc(100vw - 20px));padding:13px}.credits{font-size:10px}}
+  </style>
+</head>
+<body>
+  <div id="map" aria-label="Map. Click anywhere to choose the search location."></div>
+  <section id="panel" aria-label="High-ground search controls">
+    <h1>Find nearby high ground</h1>
+    <div class="hint">Use live location or click the map to choose a point. Select a search range to mark the two highest sampled areas.</div>
+    <button id="gps">◎ Use my live location</button>
+    <label for="radius">Search range</label>
+    <select id="radius"><option value="1">Within 1 km</option><option value="2">Within 2 km</option><option value="5">Within 5 km</option><option value="10">Within 10 km</option><option value="20">Within 20 km</option></select>
+    <div id="status" aria-live="polite">Choose your location on the map or use live location.</div>
+    <div class="note">Elevation marks are terrain samples, not confirmed safe places. Walking lines follow mapped paths only; flooding, closures and real-world access are not checked.</div>
+    <div id="results"></div>
+  </section>
+  <div class="credits">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a> · <a href="https://openfreemap.org/" target="_blank" rel="noreferrer">OpenFreeMap</a> · Routing: FOSSGIS Valhalla</div>
+  <script type="module">
+    import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.14.0/dist/maplibre-gl.mjs';
+    const map=new maplibregl.Map({container:'map',style:'https://tiles.openfreemap.org/styles/liberty',center:[78.1,17.5],zoom:9});
+    map.addControl(new maplibregl.NavigationControl(),'top-right');
+    const $=id=>document.getElementById(id);let origin=null,originMarker=null,peakMarkers=[];let searchTimer;
+    function markerElement(kind,label){const el=document.createElement('div');el.className=`marker ${kind}`;const n=document.createElement('span');n.textContent=label;el.append(n);return el}
+    function clearPeaks(){peakMarkers.forEach(m=>m.remove());peakMarkers=[];$('results').replaceChildren()}
+    function circleFeature(center,radiusKm){const coords=[];const lat1=center[1]*Math.PI/180,lon1=center[0]*Math.PI/180,d=radiusKm/6371;for(let b=0;b<=360;b+=6){const br=b*Math.PI/180;const lat2=Math.asin(Math.sin(lat1)*Math.cos(d)+Math.cos(lat1)*Math.sin(d)*Math.cos(br));const lon2=lon1+Math.atan2(Math.sin(br)*Math.sin(d)*Math.cos(lat1),Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));coords.push([lon2*180/Math.PI,lat2*180/Math.PI])}return{type:'Feature',geometry:{type:'Polygon',coordinates:[coords]},properties:{}}}
+    function setOrigin(point,zoom=true){origin=point;if(originMarker)originMarker.remove();originMarker=new maplibregl.Marker({element:markerElement('origin','•')}).setLngLat(point).setPopup(new maplibregl.Popup().setText('Search location')).addTo(map);if(zoom)map.flyTo({center:point,zoom:13});clearPeaks();scheduleSearch()}
+    async function search(){if(!origin)return;const radius=Number($('radius').value);$('status').textContent=`Searching within ${radius} km…`;clearPeaks();try{const params=new URLSearchParams({lon:String(origin[0]),lat:String(origin[1]),radius_km:String(radius)});const response=await fetch(`/api/elevated-areas?${params}`);const data=await response.json();if(!response.ok)throw Error(data.detail||'Could not search terrain.');if(map.getSource('search-radius'))map.getSource('search-radius').setData(circleFeature(origin,radius));const routeFeatures=[];for(const area of data.areas){const route=area.route;const popupText=`Highest area ${area.rank} · ${area.elevation_m.toFixed(1)} m · ${(area.distance_m/1000).toFixed(2)} km from search point${route?` · walking route ${(route.distance_m/1000).toFixed(2)} km`:''}${area.route_error?` · ${area.route_error}`:''}`;const popup=new maplibregl.Popup({offset:18}).setText(popupText);peakMarkers.push(new maplibregl.Marker({element:markerElement('peak',String(area.rank))}).setLngLat([area.lon,area.lat]).setPopup(popup).addTo(map));const item=document.createElement('div');item.className='result';item.textContent=route?`${area.rank===1?'Highest':'Second highest'} · ${area.elevation_m.toFixed(1)} m · walking route ${(route.distance_m/1000).toFixed(2)} km`:`${area.rank===1?'Highest':'Second highest'} · ${area.elevation_m.toFixed(1)} m · ${area.route_error||'Walking route unavailable.'}`;$('results').append(item);if(route)routeFeatures.push({type:'Feature',geometry:{type:'LineString',coordinates:route.coordinates},properties:{rank:area.rank}})}if(map.getSource('walking-routes'))map.getSource('walking-routes').setData({type:'FeatureCollection',features:routeFeatures});$('status').textContent=data.count?`Marked ${data.count} high-ground ${data.count===1?'area':'areas'} within ${radius} km. ${routeFeatures.length?'Walking route line(s) shown.':'No walking route returned; check the map network and internet connection.'}`:`No elevation samples fall inside this range. Increase the range or click within the mapped terrain area.`;if(data.areas.length){const bounds=new maplibregl.LngLatBounds(origin,origin);for(const a of data.areas)bounds.extend([a.lon,a.lat]);map.fitBounds(bounds,{padding:{top:90,bottom:70,left:370,right:70},maxZoom:14})}}catch(error){$('status').textContent=error.message}}
+    function scheduleSearch(){clearTimeout(searchTimer);searchTimer=setTimeout(search,180)}
+    $('gps').onclick=()=>{if(!navigator.geolocation){$('status').textContent='This browser does not provide location access.';return}$('gps').disabled=true;$('status').textContent='Requesting live location…';navigator.geolocation.getCurrentPosition(pos=>{const accuracy=Math.round(pos.coords.accuracy);$('gps').disabled=false;setOrigin([pos.coords.longitude,pos.coords.latitude]);$('status').textContent=`Location found (about ±${accuracy} m). Searching for high ground…`},err=>{$('gps').disabled=false;$('status').textContent=err.code===1?'Location permission was denied. Allow location access and try again.':`Could not get location: ${err.message}`},{enableHighAccuracy:true,timeout:15000,maximumAge:0})};
+    $('radius').onchange=()=>{if(origin)scheduleSearch()};map.on('click',e=>setOrigin([e.lngLat.lng,e.lngLat.lat]));
+    map.on('load',()=>{map.addSource('search-radius',{type:'geojson',data:{type:'FeatureCollection',features:[]}});map.addLayer({id:'search-radius-fill',type:'fill',source:'search-radius',paint:{'fill-color':'#087e8b','fill-opacity':.08}});map.addLayer({id:'search-radius-line',type:'line',source:'search-radius',paint:{'line-color':'#087e8b','line-width':2,'line-dasharray':[2,2]}});map.addSource('walking-routes',{type:'geojson',data:{type:'FeatureCollection',features:[]}});map.addLayer({id:'walking-routes-line',type:'line',source:'walking-routes',layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':['match',['get','rank'],1,'#006b58','#e4574f'],'line-width':5,'line-opacity':.9}});if(origin)search()});
+  </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+{
+  "study_area": {"name":"Hyderabad and Sangareddy, Telangana", "bbox":[77.5,17.1,78.6,17.8], "crs":"EPSG:32643"},
+  "routing": {"distance_weight":1.0,"observed_flood_penalty":1000000,"predicted_risk_weight":3.0,"unknown_data_penalty":0.35,"max_candidates":5,"snap_limit_m":5000},
+  "hazards": {"observed_flood_layer":null,"known_closures_layer":null}
+}
