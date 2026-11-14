@@ -5,3 +5,5 @@ __pycache__/
 data/
 Project_Report/rendered/
 Project_Report/*_QA.pdf
+
+.vercel
