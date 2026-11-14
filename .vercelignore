@@ -1,0 +1,11 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+tests
+Documentation
+Project_Report
+scripts
+data/osm_roads.json
+data/*.log
+requirements-dev.txt
